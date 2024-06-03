@@ -32,12 +32,12 @@ func TestRateLimiter(t *testing.T) {
 		DB:       redisDB,
 	})
 
-	rl := NewRateLimiter(redisClient, rate.Limit(rateLimitIP), rate.Limit(rateLimitToken), time.Duration(blockTime)*time.Second)
+	persistence := NewRedisPersistence(redisClient)
+	rl := NewRateLimiter(persistence, rate.Limit(rateLimitIP), rate.Limit(rateLimitToken), time.Duration(blockTime)*time.Second)
 
 	key := "test_ip"
 	isToken := false
 
-	
 	for i := 0; i < rateLimitIP; i++ {
 		if !rl.Allow(key, isToken) {
 			t.Errorf("Expected to allow request %d", i+1)
@@ -59,7 +59,6 @@ func TestRateLimiter(t *testing.T) {
 	if rl.IsBlocked(key) {
 		t.Errorf("Expected key to be unblocked")
 	}
-
 
 	key = "test_token"
 	isToken = true

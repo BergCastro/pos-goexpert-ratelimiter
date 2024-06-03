@@ -33,7 +33,8 @@ func main() {
 		DB:       redisDB,
 	})
 
-	rl := NewRateLimiter(redisClient, rate.Limit(rateLimitIP), rate.Limit(rateLimitToken), time.Duration(blockTime)*time.Second)
+	persistence := NewRedisPersistence(redisClient)
+	rl := NewRateLimiter(persistence, rate.Limit(rateLimitIP), rate.Limit(rateLimitToken), time.Duration(blockTime)*time.Second)
 
 	r := mux.NewRouter()
 	r.Use(RateLimitMiddleware(rl))

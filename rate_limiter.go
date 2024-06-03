@@ -1,27 +1,25 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"golang.org/x/time/rate"
 )
 
 type RateLimiter struct {
-	redisClient *redis.Client
-	ipLimiter   map[string]*rate.Limiter
+	persistence  Persistence
+	ipLimiter    map[string]*rate.Limiter
 	tokenLimiter map[string]*rate.Limiter
 	rateLimitIP  rate.Limit
 	rateLimitToken rate.Limit
 	blockTime    time.Duration
 }
 
-func NewRateLimiter(redisClient *redis.Client, rateLimitIP, rateLimitToken rate.Limit, blockTime time.Duration) *RateLimiter {
+func NewRateLimiter(persistence Persistence, rateLimitIP, rateLimitToken rate.Limit, blockTime time.Duration) *RateLimiter {
 	return &RateLimiter{
-		redisClient: redisClient,
-		ipLimiter:   make(map[string]*rate.Limiter),
+		persistence:  persistence,
+		ipLimiter:    make(map[string]*rate.Limiter),
 		tokenLimiter: make(map[string]*rate.Limiter),
 		rateLimitIP:  rateLimitIP,
 		rateLimitToken: rateLimitToken,
@@ -53,16 +51,15 @@ func (rl *RateLimiter) Allow(key string, isToken bool) bool {
 }
 
 func (rl *RateLimiter) Block(key string, isToken bool) {
-	ctx := context.Background()
-	rl.redisClient.Set(ctx, key, "blocked", rl.blockTime)
+	rl.persistence.Set(key, "blocked", int(rl.blockTime.Seconds()))
 }
 
 func (rl *RateLimiter) IsBlocked(key string) bool {
-	ctx := context.Background()
-	val, err := rl.redisClient.Get(ctx, key).Result()
-	if err == redis.Nil {
-		return false
-	} else if err != nil {
+	val, err := rl.persistence.Get(key)
+	if err != nil {
+		if err.Error() == "redis: nil" {
+			return false
+		}
 		fmt.Println("Error checking block status:", err)
 		return false
 	}
